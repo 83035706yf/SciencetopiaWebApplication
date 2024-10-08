@@ -12,6 +12,8 @@ using OpenAI.Extensions;
 using System.Text;
 using Azure.Storage.Blobs;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,6 +28,10 @@ builder.Services.AddScoped<StudyGroupService>();
 builder.Services.AddScoped<LearningService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<KnowledgeGraphService>();
+builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<EmailTemplateService>();
+builder.Services.AddScoped<UserActivityService>();
+builder.Services.AddScoped<DailySummaryService>();
 
 builder.Services.AddScoped<GroupManagerAuthorizeAttribute>(); // Register the custom authorization attribute
 
@@ -34,6 +40,28 @@ builder.Services.AddSingleton<IUserIdProvider, CustomUserIdProvider>();
 
 // Add SignalR service
 builder.Services.AddSignalR();
+
+// Register the hosted service
+builder.Services.AddHostedService<DailySummaryHostedService>();
+
+// Configure JWT Authentication
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+}).AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+    };
+});
 
 // // 从 appsettings.json 或环境变量获取 Elasticsearch 配置
 // var elasticsearchUrl = builder.Configuration["Elasticsearch:Url"];
@@ -111,19 +139,13 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("VueCorsPolicy", builder =>
     {
-        builder.WithOrigins("http://localhost:8080") // Replace with the URL of your Vue.js app
-            .AllowCredentials()
-            .AllowAnyMethod()
-            .AllowAnyHeader();
-    });
-    options.AddPolicy("AdminCorsPolicy", builder =>
-    {
-        builder.WithOrigins("http://localhost:8848") // Replace with the URL of your desired origin
-            .AllowCredentials()
-            .AllowAnyMethod()
-            .AllowAnyHeader();
+        builder.WithOrigins("http://localhost:8088", "http://localhost:8848")  // Allow both origins
+               .AllowAnyMethod()
+               .AllowAnyHeader()
+               .AllowCredentials();
     });
 });
+
 
 // Add authentication and authorization
 builder.Services.ConfigureApplicationCookie(options =>
@@ -136,7 +158,7 @@ builder.Services.ConfigureApplicationCookie(options =>
 // Add authorization service with role policy
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy("RequireAdministratorRole", policy => policy.RequireRole("Administrator"));
+    options.AddPolicy("RequireAdministratorRole", policy => policy.RequireRole("administrator"));
 });
 
 
@@ -168,9 +190,22 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 
 var app = builder.Build();
 
-// Use CORS policy
+// Apply CORS dynamically based on request path or origin
 app.UseCors("VueCorsPolicy");
-app.UseCors("AdminCorsPolicy");
+
+app.Use(async (context, next) =>
+{
+    if (context.Request.Method == "OPTIONS")
+    {
+        context.Response.Headers.Append("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        context.Response.Headers.Append("Access-Control-Allow-Headers", "Content-Type, Authorization");
+         context.Response.Headers.Append("Access-Control-Allow-Origin", "http://localhost:8088");
+        context.Response.Headers.Append("Access-Control-Allow-Credentials", "true");
+        context.Response.StatusCode = 204; // No Content
+        return;
+    }
+    await next();
+});
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
@@ -191,9 +226,9 @@ else
 using var scope = app.Services.CreateScope();
 var services = scope.ServiceProvider;
 var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
-if (!await roleManager.RoleExistsAsync("Administrator"))
+if (!await roleManager.RoleExistsAsync("administrator"))
 {
-    await roleManager.CreateAsync(new IdentityRole("Administrator"));
+    await roleManager.CreateAsync(new IdentityRole("administrator"));
 }
 
 app.UseMiddleware<UserActivityMiddleware>();
@@ -207,6 +242,5 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.MapHub<ChatHub>("/chathub"); // Map your ChatHub
-app.MapHub<NotificationHub>("/notificationhub");
 
 app.Run();

@@ -32,6 +32,52 @@ namespace SciencetopiaWebApplication.Migrations
                     b.ToTable("Conversations");
                 });
 
+            modelBuilder.Entity("DailySummary", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("DailyVisits")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("LoggedInUsers")
+                        .HasColumnType("int");
+
+                    b.Property<int>("NewUsers")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ReturningUsers")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TotalKnowledgeNodeViews")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TotalKnowledgeNodes")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TotalStudyGroups")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TotalUsers")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TotalVisits")
+                        .HasColumnType("int");
+
+                    b.Property<int>("WeeklyActiveStudyGroups")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DailySummaries");
+                });
+
             modelBuilder.Entity("Message", b =>
                 {
                     b.Property<string>("Id")
@@ -210,8 +256,14 @@ namespace SciencetopiaWebApplication.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("Data")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<bool>("IsRead")
                         .HasColumnType("bit");
+
+                    b.Property<string>("Type")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("UserId")
                         .HasColumnType("nvarchar(450)");
@@ -277,6 +329,9 @@ namespace SciencetopiaWebApplication.Migrations
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("bit");
 
+                    b.Property<DateTime>("RegisteredAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("nvarchar(max)");
 
@@ -290,6 +345,9 @@ namespace SciencetopiaWebApplication.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
+                    b.Property<string>("WeChatOpenId")
+                        .HasColumnType("nvarchar(max)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("NormalizedEmail")
@@ -301,6 +359,39 @@ namespace SciencetopiaWebApplication.Migrations
                         .HasFilter("[NormalizedUserName] IS NOT NULL");
 
                     b.ToTable("AspNetUsers", (string)null);
+                });
+
+            modelBuilder.Entity("VisitLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("IpAddress")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsLoggedIn")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("SessionEndTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("SessionStartTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("VisitTime")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("VisitLogs");
                 });
 
             modelBuilder.Entity("Message", b =>
@@ -384,6 +475,14 @@ namespace SciencetopiaWebApplication.Migrations
                         .HasForeignKey("UserId");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("VisitLog", b =>
+                {
+                    b.HasOne("Sciencetopia.Models.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Conversation", b =>

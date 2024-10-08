@@ -1,0 +1,45 @@
+{
+  "Files": [
+    {
+      "Id": "C:\\Users\\83035\\OneDrive - Washington University in St. Louis\\Documents\\Sciencetopia\\SciencetopiaWebApp\\SciencetopiaWebApplication\\wwwroot\\ConfirmEmail.html",
+      "PackagePath": "staticwebassets\\ConfirmEmail.html"
+    },
+    {
+      "Id": "C:\\Users\\83035\\OneDrive - Washington University in St. Louis\\Documents\\Sciencetopia\\SciencetopiaWebApp\\SciencetopiaWebApplication\\wwwroot\\ConfirmEmailRegistration.html",
+      "PackagePath": "staticwebassets\\ConfirmEmailRegistration.html"
+    },
+    {
+      "Id": "C:\\Users\\83035\\OneDrive - Washington University in St. Louis\\Documents\\Sciencetopia\\SciencetopiaWebApp\\SciencetopiaWebApplication\\wwwroot\\EmailChangeFailed.html",
+      "PackagePath": "staticwebassets\\EmailChangeFailed.html"
+    },
+    {
+      "Id": "C:\\Users\\83035\\OneDrive - Washington University in St. Louis\\Documents\\Sciencetopia\\SciencetopiaWebApp\\SciencetopiaWebApplication\\wwwroot\\EmailChangeSuccess.html",
+      "PackagePath": "staticwebassets\\EmailChangeSuccess.html"
+    },
+    {
+      "Id": "C:\\Users\\83035\\OneDrive - Washington University in St. Louis\\Documents\\Sciencetopia\\SciencetopiaWebApp\\SciencetopiaWebApplication\\wwwroot\\ForgotPassword.html",
+      "PackagePath": "staticwebassets\\ForgotPassword.html"
+    },
+    {
+      "Id": "C:\\Users\\83035\\OneDrive - Washington University in St. Louis\\Documents\\Sciencetopia\\SciencetopiaWebApp\\SciencetopiaWebApplication\\wwwroot\\ForgotUsername.html",
+      "PackagePath": "staticwebassets\\ForgotUsername.html"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.SciencetopiaWebApplication.Microsoft.AspNetCore.StaticWebAssets.props",
+      "PackagePath": "build\\Microsoft.AspNetCore.StaticWebAssets.props"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.build.SciencetopiaWebApplication.props",
+      "PackagePath": "build\\SciencetopiaWebApplication.props"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.buildMultiTargeting.SciencetopiaWebApplication.props",
+      "PackagePath": "buildMultiTargeting\\SciencetopiaWebApplication.props"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.buildTransitive.SciencetopiaWebApplication.props",
+      "PackagePath": "buildTransitive\\SciencetopiaWebApplication.props"
+    }
+  ],
+  "ElementsToRemove": []
+}

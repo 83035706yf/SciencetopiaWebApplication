@@ -29,5 +29,7 @@ public class Notification
     public DateTimeOffset CreatedAt { get; set; }
     public bool IsRead { get; set; }
     public string? UserId { get; set; }
+    public string? Type { get; set; }  // Notification type
+    public string? Data { get; set; }  // JSON string containing additional data
     public ApplicationUser? User { get; set; } // Reference ApplicationUser here
 }

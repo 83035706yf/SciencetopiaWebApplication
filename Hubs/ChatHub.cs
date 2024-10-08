@@ -139,6 +139,28 @@ namespace Sciencetopia.Hubs
                     .CountAsync();
 
                 await Clients.Caller.SendAsync("updateMessages", totalUnreadMessageCount);
+
+                // Similiarly, retrieve all notifications for the user and send them to the client
+                var notifications = await _context.Notifications
+                    .Where(n => n.UserId == userId)
+                    .OrderByDescending(n => n.CreatedAt)
+                    .Select(n => new
+                    {
+                        n.Id,
+                        n.Content,
+                        n.CreatedAt,
+                        n.IsRead,
+                        n.Type,
+                        n.Data
+                    })
+                    .ToListAsync();
+                
+                // Send the unread notification count to the user
+                var unreadNotificationCount = await _context.Notifications
+                    .Where(n => n.UserId == userId && !n.IsRead)
+                    .CountAsync();
+                
+                await Clients.Caller.SendAsync("updateNotifications", unreadNotificationCount);
             }
 
             await base.OnConnectedAsync();
@@ -169,6 +191,80 @@ namespace Sciencetopia.Hubs
 
             await Clients.User(userId).SendAsync("updateMessages", receiverMessageCount);
             await Clients.User(userId).SendAsync("updateConversationMessages", conversationId, conversationMessageCount);
+        }
+
+        // Sends a notification to a specific user
+        public async Task SendNotificationToUsers(List<string> userIds, string content, string type, string data)
+        {
+            var notifications = new List<Notification>();
+
+            foreach (var userId in userIds)
+            {
+                var notification = new Notification
+                {
+                    Content = content,
+                    CreatedAt = DateTime.UtcNow,
+                    IsRead = false,
+                    UserId = userId,
+                    Type = type,
+                    Data = data
+                };
+
+                notifications.Add(notification);
+
+                // Send the notification to the specific user via SignalR
+                await Clients.User(userId).SendAsync("ReceiveNotification", new
+                {
+                    notification.Id,
+                    notification.Content,
+                    notification.CreatedAt,
+                    notification.IsRead,
+                    notification.Type,
+                    notification.Data
+                });
+            }
+
+            // Save all notifications to the database in one go
+            _context.Notifications.AddRange(notifications);
+            await _context.SaveChangesAsync();
+
+            // Update unread notifications count for the receiver
+            foreach (var userId in userIds)
+            {
+                await Clients.User(userId).SendAsync("UpdateNotifications");
+            }
+        }
+
+        // Method to mark a notification as read, could be called from the client
+        public async Task MarkNotificationAsRead(string notificationId)
+        {
+            // Fetch the notification from the database using notificationId
+            var notification = await _context.Notifications.FindAsync(notificationId);
+            if (notification != null)
+            {
+                notification.IsRead = true;
+                await _context.SaveChangesAsync();
+            }
+
+            // Notify the client (optional, based on your app's needs)
+            await Clients.Caller.SendAsync("UpdateNotifications", notificationId);
+        }
+
+        // Additional methods as needed...
+        public async Task MarkAllNotificationsAsRead(string userId)
+        {
+            var notifications = await _context.Notifications
+                .Where(n => n.UserId == userId && !n.IsRead)
+                .ToListAsync();
+
+            foreach (var notification in notifications)
+            {
+                notification.IsRead = true;
+            }
+
+            await _context.SaveChangesAsync();
+
+            await Clients.User(userId).SendAsync("UpdateNotifications");
         }
     }
 }

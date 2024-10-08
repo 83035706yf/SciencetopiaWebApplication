@@ -1,13 +1,21 @@
+using Microsoft.AspNetCore.SignalR;
 using Neo4j.Driver;
 using Sciencetopia.Models;
+using Sciencetopia.Services;
+using Sciencetopia.Hubs;
+using Newtonsoft.Json;
 
 public class StudyGroupService
 {
     private readonly IDriver _neo4jDriver;
+    private readonly UserService _userService;
+    private readonly IHubContext<ChatHub> _hubContext;
 
-    public StudyGroupService(IDriver neo4jDriver)
+    public StudyGroupService(IDriver neo4jDriver, UserService userService, IHubContext<ChatHub> hubContext)
     {
         _neo4jDriver = neo4jDriver;
+        _userService = userService;
+        _hubContext = hubContext;
     }
 
     public async Task<bool> CreateStudyGroupAsync(StudyGroupDTO studyGroupDTO, string userId)
@@ -175,7 +183,7 @@ public class StudyGroupService
             var result = await session.ExecuteReadAsync(async tx =>
             {
                 var query = @"
-                    MATCH (s:StudyGroup)
+                    MATCH (s:StudyGroup {status: 'approved'})
                     RETURN s";
 
                 var cursor = await tx.RunAsync(query);
@@ -188,6 +196,7 @@ public class StudyGroupService
                 // Assuming 's' is a node returned in the record
                 var studyGroupNode = record["s"].As<INode>();
                 var studyGroupId = studyGroupNode.Properties["id"].As<string>();
+                var status = studyGroupNode.Properties["status"].As<string>();
 
                 // Fetch the members' info from the connected user node
                 var members = await GetStudyGroupMembers(studyGroupId);
@@ -197,7 +206,8 @@ public class StudyGroupService
                     Id = studyGroupId,
                     Name = studyGroupNode.Properties["name"].As<string>(),
                     Description = studyGroupNode.Properties["description"].As<string>(),
-                    MemberIds = members
+                    MemberIds = members,
+                    Status = status
                 };
                 studyGroups.Add(studyGroup);
             }
@@ -214,31 +224,58 @@ public class StudyGroupService
             {
                 var query = @"
                 MATCH (u:User)-[r:MEMBER_OF]->(s:StudyGroup {id: $groupId})
-                RETURN u, r.role as role";
+                RETURN u.id AS userId, r.role AS role";
                 var parameters = new Dictionary<string, object>
                 {
                 {"groupId", groupId}
                 };
 
                 var cursor = await tx.RunAsync(query, parameters);
-                return await cursor.ToListAsync();
+                return await cursor.ToListAsync(record => new
+                {
+                    UserId = record["userId"].As<string>(),
+                    Role = record["role"].As<string>()
+                });
             });
 
             var members = new List<GroupMember>();
+
             foreach (var record in result)
             {
-                // Assuming 'u' is a node returned in the record
-                var userNode = record["u"].As<INode>();
+                var userName = await _userService.GetUserNameByIdAsync(record.UserId);
+                var avatarUrl = await _userService.FetchUserAvatarUrlByIdAsync(record.UserId);
 
-                var user = new GroupMember
+                var member = new GroupMember
                 {
-                    Id = userNode.Properties["id"].As<string>(),
-                    Role = record["role"].As<string>()  // Add role to the member info
+                    Id = record.UserId,
+                    UserName = userName,
+                    AvatarUrl = avatarUrl,
+                    Role = record.Role
                 };
-                members.Add(user);
+
+                members.Add(member);
             }
 
             return members;
+        }
+    }
+
+    public async Task<List<string>> GetGroupManagersAsync(string studyGroupId)
+    {
+        using (var session = _neo4jDriver.AsyncSession())
+        {
+            var result = await session.ExecuteReadAsync(async tx =>
+            {
+                var query = @"
+                MATCH (sg:StudyGroup {id: $studyGroupId})<-[:MEMBER_OF {role: 'manager'}]-(u:User)
+                RETURN u.id AS managerId";
+
+                var parameters = new { studyGroupId };
+                var cursor = await tx.RunAsync(query, parameters);
+                return await cursor.ToListAsync(record => record["managerId"].As<string>());
+            });
+
+            return result;
         }
     }
 
@@ -371,8 +408,10 @@ public class StudyGroupService
                     "MERGE (u)-[r:APPLIED_TO {status: 'Pending', appliedOn: $appliedOn}]->(sg) " +
                     "RETURN r",
                     new { userId, studyGroupId, appliedOn = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss") });
+
                 return await cursor.SingleAsync() != null;
             });
+
             return result;
         }
         finally
@@ -486,7 +525,8 @@ public class StudyGroupService
                     Name = studyGroupNode.Properties["name"].As<string>(),
                     Description = studyGroupNode.Properties["description"].As<string>(),
                     MemberIds = members,
-                    Role = record["role"].As<string>() // Set the role property here
+                    Role = record["role"].As<string>(), // Set the role property here
+                    Status = studyGroupNode.Properties["status"].As<string>()
                 };
                 studyGroups.Add(studyGroup);
             }
@@ -750,18 +790,36 @@ public class StudyGroupService
             {
                 var query = @"
                 MATCH (u:User)-[r:APPLIED_TO]->(s:StudyGroup {id: $groupId})
-                RETURN u.id AS userId, u.name AS name, r.appliedOn AS appliedOn";
+                RETURN u.id AS userId, r.appliedOn AS appliedOn";
                 var parameters = new { groupId };
                 var cursor = await tx.RunAsync(query, parameters);
-                return await cursor.ToListAsync(record => new JoinRequest
+                return await cursor.ToListAsync(record => new
                 {
                     UserId = record["userId"].As<string>(),
-                    Name = record["name"].As<string>(),
                     AppliedOn = record["appliedOn"].As<string>()
                 });
             });
 
-            return result;
+            var joinRequests = new List<JoinRequest>();
+
+            foreach (var record in result)
+            {
+                // Sequentially fetching UserName and AvatarUrl
+                var userName = await _userService.GetUserNameByIdAsync(record.UserId);
+                var avatarUrl = await _userService.FetchUserAvatarUrlByIdAsync(record.UserId);
+
+                var joinRequest = new JoinRequest
+                {
+                    UserId = record.UserId,
+                    Name = userName,
+                    AvatarUrl = avatarUrl,
+                    AppliedOn = record.AppliedOn
+                };
+
+                joinRequests.Add(joinRequest);
+            }
+
+            return joinRequests;
         }
     }
 

@@ -78,6 +78,18 @@ public class StudyGroupController : ControllerBase
         return Ok(group);
     }
 
+    [HttpGet("GetGroupManagers/{studyGroupId}")]
+    public async Task<IActionResult> GetGroupManagers(string studyGroupId)
+    {
+        var managerIds = await _studyGroupService.GetGroupManagersAsync(studyGroupId);
+        if (managerIds == null || !managerIds.Any())
+        {
+            return NotFound("No managers found for this study group.");
+        }
+        return Ok(managerIds);
+    }
+
+
     [HttpGet("GetMyStudyGroup")]
     [Authorize] // Ensure only authenticated users can access this endpoint
     public async Task<ActionResult<List<StudyGroup>>> GetMyStudyGroup()
@@ -124,7 +136,7 @@ public class StudyGroupController : ControllerBase
     }
 
     [HttpPost("ApproveStudyGroup")]
-    [Authorize(Roles = "Administrator")]
+    [Authorize(Roles = "administrator")]
     public async Task<ActionResult> ApproveStudyGroupAsync([FromBody] string groupId)
     {
         // Retrieve the admin's ID from the ClaimsPrincipal
@@ -148,7 +160,7 @@ public class StudyGroupController : ControllerBase
     }
 
     [HttpPost("RejectStudyGroup")]
-    [Authorize(Roles = "Administrator")]
+    [Authorize(Roles = "administrator")]
     public async Task<ActionResult> RejectStudyGroupAsync([FromBody] string groupId)
     {
         // Retrieve the admin's ID from the ClaimsPrincipal
@@ -171,8 +183,8 @@ public class StudyGroupController : ControllerBase
         }
     }
 
-    [HttpPost("ViewCreateStudyGroupRequests")]
-    [Authorize(Roles = "Administrator")]
+    [HttpGet("ViewCreateStudyGroupRequests")]
+    [Authorize(Roles = "administrator")]
     public async Task<ActionResult> ViewCreateStudyGroupRequests()
     {
         // Retrieve the admin's ID from the ClaimsPrincipal

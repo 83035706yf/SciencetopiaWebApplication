@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        .email-container {
+            font-family: Arial, sans-serif;
+            background-color: #f9f9f9;
+            padding: 20px;
+            text-align: center;
+        }
+        .email-header {
+            background-color: #e4d8c0;
+            color: white;
+            padding: 10px;
+            font-size: 24px;
+        }
+        .email-body {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .email-footer {
+            color: #999;
+            margin-top: 20px;
+            font-size: 12px;
+        }
+        .footer-image {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="email-header">
+            找回您的用户名
+        </div>
+        <div class="email-body">
+            <p>亲爱的用户，</p>
+            <p>您的用户名是：<strong>{UserName}</strong></p>
+            <p>感谢您的支持，<br/>Sciencetopia 团队</p>
+        </div>
+        <div class="footer-image">
+            <img src="{FooterImageUrl}" alt="Footer Image" width="100%" style="max-width: 600px;">
+        </div>
+    </div>
+</body>
+</html>

@@ -26,18 +26,11 @@ public class AllUsersController : ControllerBase
     [HttpGet("GetUserInfoById/{userId}")]
     public async Task<IActionResult> GetUserInfoById(string userId)
     {
-        var user = await _userManager.FindByIdAsync(userId);
-        if (user == null)
+        var userInfo = await _userService.GetUserInfoByIdAsync(userId);
+        if (userInfo == null)
         {
             return NotFound("User not found.");
         }
-
-        var userInfo = new UserInformationDTO
-        {
-            UserName = user.UserName,
-            Email = user.Email,
-            SelfIntroduction = user.SelfIntroduction,
-        };
 
         return Ok(userInfo);
     }

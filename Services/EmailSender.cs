@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Mail;
-using System.Threading.Tasks;
 using Sciencetopia.Services;
 
 public class EmailSender : IEmailSender
@@ -11,14 +10,16 @@ public class EmailSender : IEmailSender
     private readonly string _smtpUsername;
     private readonly string _smtpPassword;
 
-    public EmailSender()
+    public EmailSender(IConfiguration configuration)
     {
-        // Initialize these with your SMTP settings
-        _smtpServer = "smtp.gmail.com";
-        _smtpPort = 587; // Example SMTP port
-        _fromAddress = "83035706yf@gmail.com";
-        _smtpUsername = "83035706yf@gmail.com";
-        _smtpPassword = "MyPinTheStrongest";
+        _smtpServer = configuration["Smtp:Server"] ?? throw new ArgumentNullException(nameof(_smtpServer), "SMTP server is not configured.");
+        if (!int.TryParse(configuration["Smtp:Port"], out _smtpPort))
+        {
+            throw new ArgumentException("Invalid SMTP port number.");
+        }
+        _fromAddress = configuration["Smtp:FromAddress"] ?? throw new ArgumentNullException(nameof(_fromAddress), "From address is not configured.");
+        _smtpUsername = configuration["Smtp:Username"] ?? throw new ArgumentNullException(nameof(_smtpUsername), "SMTP username is not configured.");
+        _smtpPassword = configuration["Smtp:Password"] ?? throw new ArgumentNullException(nameof(_smtpPassword), "SMTP password is not configured.");
     }
 
     public async Task SendEmailAsync(string email, string subject, string message)
@@ -41,3 +42,4 @@ public class EmailSender : IEmailSender
         await client.SendMailAsync(mailMessage);
     }
 }
+

@@ -124,7 +124,7 @@ namespace Sciencetopia.Controllers
         }
 
         [HttpPost("ApproveNode")]
-        [Authorize(Roles = "Administrator")]
+        [Authorize(Roles = "administrator")]
         public async Task<IActionResult> ApproveNode(string nodeName)
         {
             if (string.IsNullOrWhiteSpace(nodeName))
@@ -147,7 +147,7 @@ namespace Sciencetopia.Controllers
         }
 
         [HttpPost("RejectNode")]
-        [Authorize(Roles = "Administrator")]
+        [Authorize(Roles = "administrator")]
         public async Task<IActionResult> DisapproveNode(string nodeName)
         {
             if (string.IsNullOrWhiteSpace(nodeName))
@@ -192,7 +192,7 @@ namespace Sciencetopia.Controllers
         }
 
         [HttpPost("ApproveRelationship")]
-        [Authorize(Roles = "Administrator")]
+        [Authorize(Roles = "administrator")]
         public async Task<IActionResult> ApproveRelationship(string sourceNodeName, string targetNodeName, string relationshipType)
         {
             if (string.IsNullOrWhiteSpace(sourceNodeName) || string.IsNullOrWhiteSpace(targetNodeName) || string.IsNullOrWhiteSpace(relationshipType))
@@ -215,7 +215,7 @@ namespace Sciencetopia.Controllers
         }
 
         [HttpPost("RejectRelationship")]
-        [Authorize(Roles = "Administrator")]
+        [Authorize(Roles = "administrator")]
         public async Task<IActionResult> DisapproveRelationship(string sourceNodeName, string targetNodeName, string relationshipType)
         {
             if (string.IsNullOrWhiteSpace(sourceNodeName) || string.IsNullOrWhiteSpace(targetNodeName) || string.IsNullOrWhiteSpace(relationshipType))
@@ -287,6 +287,7 @@ namespace Sciencetopia.Controllers
         }
 
         [HttpGet("GetPendingNodes")]
+        [Authorize(Roles = "administrator")]
         public async Task<IActionResult> GetPendingNodes()
         {
             try

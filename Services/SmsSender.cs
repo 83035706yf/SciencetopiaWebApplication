@@ -1,27 +1,32 @@
-using System.Threading.Tasks;
 using Twilio;
 using Twilio.Rest.Api.V2010.Account;
+using Twilio.Types;
 using Sciencetopia.Services;
 
 public class SmsSender : ISmsSender
 {
-    private readonly string _accountSid;
-    private readonly string _authToken;
-    private readonly string _fromNumber;
+    private readonly IConfiguration _configuration;
 
-    public SmsSender()
+    public SmsSender(IConfiguration configuration)
     {
-        _accountSid = "your_account_sid";
-        _authToken = "your_auth_token";
-        _fromNumber = "+1234567890"; // Your Twilio number
-        TwilioClient.Init(_accountSid, _authToken);
+        _configuration = configuration;
+        TwilioClient.Init(
+            _configuration["Twilio:AccountSid"],
+            _configuration["Twilio:AuthToken"]
+        );
     }
 
     public async Task SendSmsAsync(string number, string message)
     {
-        await MessageResource.CreateAsync(
-            to: new Twilio.Types.PhoneNumber(number),
-            from: new Twilio.Types.PhoneNumber(_fromNumber),
-            body: message);
+        var from = new PhoneNumber(_configuration["Twilio:FromPhoneNumber"]);
+        var to = new PhoneNumber(number);
+
+        var messageOptions = new CreateMessageOptions(to)
+        {
+            From = from,
+            Body = message
+        };
+
+        await MessageResource.CreateAsync(messageOptions);
     }
 }

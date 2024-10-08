@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        .email-container {
+            font-family: Arial, sans-serif;
+            background-color: #f9f9f9;
+            padding: 20px;
+            text-align: center;
+        }
+        .email-header {
+            background-color: #e4d8c0;
+            color: white;
+            padding: 10px;
+            font-size: 24px;
+        }
+        .email-body {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .email-button {
+            display: inline-block;
+            background-color: #e4d8c0;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .email-footer {
+            color: #999;
+            margin-top: 20px;
+            font-size: 12px;
+        }
+        .footer-image {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class='email-container'>
+        <div class='email-header'>
+            确认您的邮箱地址
+        </div>
+        <div class='email-body'>
+            <p>亲爱的 {UserName}，</p>
+            <p>感谢您注册Sciencetopia！请点击下方按钮确认您的邮箱地址：</p>
+            <a href='{CallbackUrl}' class='email-button'>确认邮箱</a>
+            <p>如果您没有请求此邮件，请忽略它。</p>
+            <p>感谢您的支持，<br/>Sciencetopia 团队</p>
+        </div>
+        <div class='email-footer'>
+            如果按钮无法点击，请将以下链接复制到浏览器中访问：<br/>
+            <a href='{CallbackUrl}'>{CallbackUrl}</a>
+        </div>
+        <div class='footer-image'>
+            <img src='{FooterImageUrl}' alt='Footer Image' width='100%' style='max-width: 600px;'>
+        </div>
+    </div>
+</body>
+</html>
