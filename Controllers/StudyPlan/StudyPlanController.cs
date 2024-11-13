@@ -42,8 +42,30 @@ namespace Sciencetopia.Controllers
             }
         }
 
-        [HttpGet("FetchStudyPlan")]
-        public async Task<IActionResult> FetchStudyPlan()
+        [HttpGet("FetchStudyPlans")]
+        public async Task<IActionResult> FetchStudyPlans([FromQuery] string? targetUserId = null)
+        {
+            string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (string.IsNullOrEmpty(currentUserId))
+            {
+                return Unauthorized("User is not authenticated.");
+            }
+
+            targetUserId ??= currentUserId;
+
+            var studyPlans = await _studyPlanService.GetStudyPlansByUserIdAsync(currentUserId, targetUserId);
+
+            if (studyPlans == null || !studyPlans.Any())
+            {
+                return Ok(new List<StudyPlanDTO>());  // Return an empty list if no study plans are found
+            }
+
+            return Ok(studyPlans);
+        }
+
+        [HttpPost("UpdateStudyPlan")]
+        public async Task<IActionResult> UpdateStudyPlan([FromBody] StudyPlanDTO studyPlanDTO)
         {
             string userId = User?.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
 
@@ -53,14 +75,15 @@ namespace Sciencetopia.Controllers
                 return Unauthorized("User is not authenticated.");
             }
 
-            var studyPlan = await _studyPlanService.GetStudyPlansByUserIdAsync(userId);
-
-            if (studyPlan == null)
+            var success = await _studyPlanService.UpdateStudyPlanAsync(studyPlanDTO);
+            if (success)
             {
-                return NotFound("Study plan not found for the user.");
+                return Ok(new { message = "Study plan updated successfully." });
             }
-
-            return Ok(studyPlan);
+            else
+            {
+                return NotFound(new { message = "Study plan not found or could not be updated." });
+            }
         }
 
         [HttpPost("MarkStudyPlanAsCompleted")]
@@ -71,17 +94,17 @@ namespace Sciencetopia.Controllers
             // Ensure the user is authenticated
             if (string.IsNullOrEmpty(userId))
             {
-            return Unauthorized("User is not authenticated.");
+                return Unauthorized("User is not authenticated.");
             }
 
             var success = await _studyPlanService.MarkStudyPlanAsCompletedAsync(studyPlanTitle, userId);
             if (success)
             {
-            return Ok(new { message = "Study plan marked as completed." });
+                return Ok(new { message = "Study plan marked as completed." });
             }
             else
             {
-            return NotFound(new { message = "Study plan not found or could not be marked as completed." });
+                return NotFound(new { message = "Study plan not found or could not be marked as completed." });
             }
         }
 
@@ -93,17 +116,17 @@ namespace Sciencetopia.Controllers
             // Ensure the user is authenticated
             if (string.IsNullOrEmpty(userId))
             {
-            return Unauthorized("User is not authenticated.");
+                return Unauthorized("User is not authenticated.");
             }
 
             var success = await _studyPlanService.DisMarkStudyPlanAsCompletedAsync(studyPlanTitle, userId);
             if (success)
             {
-            return Ok(new { message = "Removed marking study plan as completed." });
+                return Ok(new { message = "Removed marking study plan as completed." });
             }
             else
             {
-            return NotFound(new { message = "Study plan not found or mark of completion could not be removed." });
+                return NotFound(new { message = "Study plan not found or mark of completion could not be removed." });
             }
         }
 
@@ -117,7 +140,7 @@ namespace Sciencetopia.Controllers
             }
 
             var count = await _studyPlanService.CountCompletedStudyPlansAsync(userId);
-            
+
             return Ok(count);
         }
 
@@ -141,6 +164,28 @@ namespace Sciencetopia.Controllers
             {
                 return NotFound(new { message = "Study plan not found or could not be deleted." });
             }
+        }
+
+        [HttpPost("SetStudyPlanPrivacy")]
+        public async Task<IActionResult> SetStudyPlanPrivacy([FromBody] SetPrivacyRequest request)
+        {
+            string userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            // Ensure the user is authenticated
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized("User is not authenticated.");
+            }
+
+            // Call the service method to update the privacy setting
+            var success = await _studyPlanService.SetStudyPlanPrivacyAsync(userId, request.StudyPlanId, request.Privacy);
+
+            if (!success)
+            {
+                return NotFound("Study plan not found or could not be updated.");
+            }
+
+            return Ok("Privacy updated successfully.");
         }
     }
 }

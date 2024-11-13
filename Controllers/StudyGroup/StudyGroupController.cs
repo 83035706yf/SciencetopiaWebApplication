@@ -67,16 +67,16 @@ public class StudyGroupController : ControllerBase
         return Ok(members);
     }
 
-    [HttpGet("GetStudyGroupByUser/{userId}")]
-    public async Task<ActionResult<StudyGroup>> GetStudyGroupByUser(string userId)
-    {
-        var group = await _studyGroupService.GetStudyGroupByUser(userId);
-        if (group == null)
-        {
-            return NotFound("Study group not found.");
-        }
-        return Ok(group);
-    }
+    // [HttpGet("GetStudyGroupByUser/{userId}")]
+    // public async Task<ActionResult<StudyGroup>> GetStudyGroupByUser(string userId)
+    // {
+    //     var group = await _studyGroupService.GetStudyGroupByUser(userId);
+    //     if (group == null)
+    //     {
+    //         return NotFound("Study group not found.");
+    //     }
+    //     return Ok(group);
+    // }
 
     [HttpGet("GetGroupManagers/{studyGroupId}")]
     public async Task<IActionResult> GetGroupManagers(string studyGroupId)
@@ -90,25 +90,32 @@ public class StudyGroupController : ControllerBase
     }
 
 
-    [HttpGet("GetMyStudyGroup")]
+    [HttpGet("GetStudyGroup")]
     [Authorize] // Ensure only authenticated users can access this endpoint
-    public async Task<ActionResult<List<StudyGroup>>> GetMyStudyGroup()
+    public async Task<ActionResult<List<StudyGroup>>> GetStudyGroup([FromQuery] string? targetUserId = null)
     {
-        // Retrieve the user's ID from the ClaimsPrincipal
-        string userId = User?.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+        // Retrieve the authenticated user's ID from the ClaimsPrincipal
+        string currentUserId = User?.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
 
         // Ensure the user is authenticated
-        if (string.IsNullOrEmpty(userId))
+        if (string.IsNullOrEmpty(currentUserId))
         {
             return Unauthorized("User is not authenticated.");
         }
 
-        var groups = await _studyGroupService.GetStudyGroupByUser(userId);
+        // If targetUserId is provided, use it; otherwise, use the authenticated user's ID
+        string userIdToFetch = !string.IsNullOrEmpty(targetUserId) ? targetUserId : currentUserId;
+
+        // Fetch the study groups based on the provided or authenticated userId
+        var groups = await _studyGroupService.GetStudyGroupByUser(userIdToFetch, currentUserId);
+
+        // Return an empty list if no groups are found, instead of returning NotFound
         if (groups == null || !groups.Any())
         {
-            return NotFound("Study groups not found.");
+            return Ok(new List<StudyGroup>()); // Return an empty list if no study groups are found
         }
-        return Ok(groups);
+
+        return Ok(groups); // Return the found groups
     }
 
     [HttpPost("CreateStudyGroup")]
@@ -262,6 +269,53 @@ public class StudyGroupController : ControllerBase
         }
     }
 
+    [HttpPost("LeaveStudyGroup")]
+    public async Task<IActionResult> LeaveStudyGroup([FromBody] LeaveGroupRequest leaveGroupRequest)
+    {
+        try
+        {
+            var result = await _studyGroupService.LeaveStudyGroup(leaveGroupRequest.UserId, leaveGroupRequest.GroupId);
+
+            if (result)
+            {
+                return Ok(new { message = "Successfully left the study group." });
+            }
+            else
+            {
+                return NotFound(new { message = "User was not a member of the study group." });
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            // Return a 400 Bad Request if the user is the manager and cannot leave
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"Internal server error: {ex.Message}");
+        }
+    }
+
+    [HttpPost("DissolveStudyGroup")]
+    public async Task<IActionResult> DissolveStudyGroup([FromBody] DissolveGroupRequest request)
+    {
+        try
+        {
+            var result = await _studyGroupService.DissolveStudyGroup(request.UserId, request.GroupId);
+
+            return Ok(new { message = "Study group successfully dissolved." });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            // Return a 403 Forbidden with a custom message
+            return StatusCode(403, new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = $"Internal server error: {ex.Message}" });
+        }
+    }
+
     [HttpPost("UpdateApplicationStatus")]
     public async Task<IActionResult> UpdateApplicationStatus([FromBody] UpdateStatusRequest request)
     {
@@ -314,6 +368,24 @@ public class StudyGroupController : ControllerBase
             return NotFound("Join requests not found.");
         }
         return Ok(requests);
+    }
+
+    // API to get the count of pending join requests
+    [HttpGet("GetPendingJoinRequestsCount/{groupId}")]
+    public async Task<IActionResult> GetPendingJoinRequestsCount(string groupId)
+    {
+        try
+        {
+            // Call the service to get the count of pending join requests
+            var pendingCount = await _studyGroupService.GetPendingJoinRequestsCount(groupId);
+
+            return Ok(pendingCount);  // Return the count as the response
+        }
+        catch (Exception ex)
+        {
+            // Handle exceptions and return appropriate error response
+            return StatusCode(500, $"Internal server error: {ex.Message}");
+        }
     }
 
     [HttpGet("GetActivityLogs/{groupId}")]

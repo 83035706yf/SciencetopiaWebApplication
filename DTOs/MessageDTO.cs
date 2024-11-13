@@ -24,7 +24,7 @@ public class MessageWithUserDetailsDTO
     public string? Content { get; set; }
     public DateTimeOffset SentTime { get; set; }
     public UserDetailsDTO? Sender { get; set; }
-    public int UnreadMessageCount { get; set; } // Add this field
+    public bool IsRead { get; set; }
 }
 
 public class UserDetailsDTO

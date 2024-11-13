@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "n59Arcj9Avkr6MacQNv2UGGGNkXiKE3adOChsAD4DZDlJRlF45nmcB2x8cBNXlxEaRmcgKqRh8DkP2m/u0VHJQ==",
+  "dgSpecHash": "Iv3BoYsU5uPnFANU8FdjgOHAdoVOe2i/tMY0CjjM4KTtoVyvxTZ3OgNDCpB7lgA+1zi54aR+YAPDkEKij4oMWw==",
   "success": true,
   "projectFilePath": "C:\\Users\\83035\\OneDrive - Washington University in St. Louis\\Documents\\Sciencetopia\\SciencetopiaWebApp\\SciencetopiaWebApplication\\SciencetopiaWebApplication.csproj",
   "expectedPackageFiles": [
@@ -156,7 +156,7 @@
       "code": "NU1701",
       "level": "Warning",
       "warningLevel": 1,
-      "message": "已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“net8.0”还原包“iTextSharp 5.5.13.4”。此包可能与项目不完全兼容。",
+      "message": "Package 'iTextSharp 5.5.13.4' was restored using '.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1' instead of the project target framework 'net8.0'. This package may not be fully compatible with your project.",
       "libraryId": "iTextSharp",
       "targetGraphs": [
         "net8.0"

@@ -4,18 +4,21 @@ using Sciencetopia.Models;
 using Sciencetopia.Services;
 using Sciencetopia.Hubs;
 using Newtonsoft.Json;
+using Sciencetopia.Data;
 
 public class StudyGroupService
 {
     private readonly IDriver _neo4jDriver;
     private readonly UserService _userService;
+    private readonly ApplicationDbContext _context;
     private readonly IHubContext<ChatHub> _hubContext;
 
-    public StudyGroupService(IDriver neo4jDriver, UserService userService, IHubContext<ChatHub> hubContext)
+    public StudyGroupService(IDriver neo4jDriver, UserService userService, IHubContext<ChatHub> hubContext, ApplicationDbContext context)
     {
         _neo4jDriver = neo4jDriver;
         _userService = userService;
         _hubContext = hubContext;
+        _context = context;
     }
 
     public async Task<bool> CreateStudyGroupAsync(StudyGroupDTO studyGroupDTO, string userId)
@@ -412,7 +415,45 @@ public class StudyGroupService
                 return await cursor.SingleAsync() != null;
             });
 
+            if (result)
+            {
+                // Notify all the managers of the study group about the application
+                await NotifyStudyGroupManagers(studyGroupId, userId);
+            }
+
             return result;
+        }
+        finally
+        {
+            await session.CloseAsync();
+        }
+    }
+
+    private async Task NotifyStudyGroupManagers(string studyGroupId, string userId)
+    {
+        var session = _neo4jDriver.AsyncSession();
+        try
+        {
+            var cursor = await session.RunAsync(
+                "MATCH (m:User)-[r:MEMBER_OF {role: 'manager'}]->(sg:StudyGroup {id: $studyGroupId}) " +
+                "RETURN m.id AS managerId, sg.name AS studyGroupName",
+                new { studyGroupId });
+
+            var managerIds = await cursor.ToListAsync(record => record["managerId"].As<string>());
+            var studyGroupName = await cursor.SingleAsync(record => record["studyGroupName"].As<string>());
+
+            if (managerIds.Count > 0)
+            {
+                // Send notification using SignalR's SendNotificationToUsers method from ChatHub
+                var notificationContent = $"User {userId} has applied to join your study group {studyGroupName}.";
+                var notificationType = "StudyGroupApplication";
+                // Only the URL to the join-request page is stored in the Data field
+                var notificationUrl = $"/studygroup/{studyGroupId}";
+
+                // Use the existing SendNotificationToUsers method from ChatHub
+                var chatHub = new ChatHub(_context); // Assuming _context is your ApplicationDbContext
+                await chatHub.SendNotificationToUsers(managerIds, notificationContent, notificationType, notificationUrl);
+            }
         }
         finally
         {
@@ -491,7 +532,78 @@ public class StudyGroupService
         }
     }
 
-    internal async Task<List<StudyGroup>> GetStudyGroupByUser(string userId)
+    public async Task<bool> LeaveStudyGroup(string userId, string groupId)
+    {
+        using (var session = _neo4jDriver.AsyncSession())
+        {
+            return await session.ExecuteWriteAsync(async tx =>
+            {
+                // Check if the user is a manager
+                var checkManagerQuery = @"
+                MATCH (u:User {id: $userId})-[r:MANAGES]->(sg:StudyGroup {id: $groupId})
+                RETURN COUNT(r) AS isManager";
+
+                var managerCursor = await tx.RunAsync(checkManagerQuery, new { userId, groupId });
+                var managerResult = await managerCursor.SingleAsync();
+                var isManager = managerResult["isManager"].As<int>() > 0;
+
+                if (isManager)
+                {
+                    // User is the manager, they cannot leave the group
+                    throw new InvalidOperationException("Managers cannot leave their own study group. You must dissolve the group.");
+                }
+
+                // If the user is not the manager, allow them to leave the group
+                var leaveGroupQuery = @"
+                MATCH (u:User {id: $userId})-[r:MEMBER_OF]->(sg:StudyGroup {id: $groupId})
+                DELETE r
+                RETURN COUNT(r) AS removedCount";
+
+                var leaveCursor = await tx.RunAsync(leaveGroupQuery, new { userId, groupId });
+                var leaveResult = await leaveCursor.SingleAsync();
+                var removedCount = leaveResult["removedCount"].As<int>();
+
+                return removedCount > 0;
+            });
+        }
+    }
+
+    public async Task<bool> DissolveStudyGroup(string userId, string groupId)
+    {
+        using (var session = _neo4jDriver.AsyncSession())
+        {
+            return await session.ExecuteWriteAsync(async tx =>
+            {
+                // Check if the user is the manager of the study group
+                var checkManagerQuery = @"
+                MATCH (u:User {id: $userId})-[r:MANAGES]->(sg:StudyGroup {id: $groupId})
+                RETURN COUNT(r) AS isManager";
+
+                var managerCursor = await tx.RunAsync(checkManagerQuery, new { userId, groupId });
+                var managerResult = await managerCursor.SingleAsync();
+                var isManager = managerResult["isManager"].As<int>() > 0;
+
+                if (!isManager)
+                {
+                    // User is not the manager, so they cannot dissolve the group
+                    throw new UnauthorizedAccessException("Only the manager can dissolve the study group.");
+                }
+
+                // If the user is the manager, dissolve the group
+                var dissolveQuery = @"
+                MATCH (sg:StudyGroup {id: $groupId})
+                OPTIONAL MATCH (sg)-[r]-()
+                DELETE sg, r";
+
+                var parameters = new { groupId };
+                await tx.RunAsync(dissolveQuery, parameters);
+
+                return true;  // Successfully dissolved the group
+            });
+        }
+    }
+
+    internal async Task<List<StudyGroup>> GetStudyGroupByUser(string userId, string currentUserId)
     {
         using (var session = _neo4jDriver.AsyncSession())
         {
@@ -499,10 +611,16 @@ public class StudyGroupService
             {
                 var query = @"
             MATCH (u:User {id: $userId})-[r:MEMBER_OF]->(s:StudyGroup)
+            WHERE 
+                s.privacy = 'public' OR
+                s.privacy = 'shared' OR
+                (s.privacy = 'private' AND $currentUserId IN [(u)-[:MEMBER_OF]->(s) | u.id])
             RETURN s, r.role as role";
+
                 var parameters = new Dictionary<string, object>
                 {
-                {"userId", userId}
+                {"userId", userId},
+                {"currentUserId", currentUserId}
                 };
 
                 var cursor = await tx.RunAsync(query, parameters);
@@ -820,6 +938,27 @@ public class StudyGroupService
             }
 
             return joinRequests;
+        }
+    }
+
+    public async Task<int> GetPendingJoinRequestsCount(string groupId)
+    {
+        using (var session = _neo4jDriver.AsyncSession())
+        {
+            var result = await session.ExecuteReadAsync(async tx =>
+            {
+                var query = @"
+            MATCH (u:User)-[r:APPLIED_TO {status: 'Pending'}]->(s:StudyGroup {id: $groupId})
+            RETURN COUNT(r) AS pendingCount";
+
+                var parameters = new { groupId };
+                var cursor = await tx.RunAsync(query, parameters);
+
+                var record = await cursor.SingleAsync();
+                return record["pendingCount"].As<int>();  // Return the count of pending join requests
+            });
+
+            return result;
         }
     }
 

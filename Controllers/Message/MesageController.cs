@@ -56,7 +56,8 @@ public class MessageController : ControllerBase
                                     {
                                         Id = m.Sender.Id,
                                         UserName = m.Sender.UserName,
-                                    }
+                                    },
+                                    IsRead = m.IsRead
                                 }).ToList(),
                 LastMessageSentTime = group.Max(m => m.SentTime) // Fetch the latest sent time for sorting
             })
@@ -91,6 +92,66 @@ public class MessageController : ControllerBase
         }
 
         return Ok(result);
+    }
+
+    [HttpGet("GetConversation/{conversationId}")]
+    public async Task<ActionResult<GroupedMessageDTO>> GetConversation(string conversationId)
+    {
+        // Step 1: Retrieve the conversation and related messages
+        var conversationGroup = await _context.Messages
+            .Include(m => m.Sender)
+            .Include(m => m.Receiver)
+            .Where(m => m.ConversationId == conversationId)
+            .OrderBy(m => m.SentTime)
+            .ToListAsync();
+
+        // Step 2: If no messages are found, return an empty conversation structure
+        if (!conversationGroup.Any())
+        {
+            return Ok(new GroupedMessageDTO
+            {
+                ConversationId = conversationId,
+                PartnerId = null,
+                PartnerName = "Unknown", // Placeholder, adjust if you have specific data requirements
+                UnreadMessageCount = 0,
+                Messages = new List<MessageWithUserDetailsDTO>()
+            });
+        }
+
+        // Step 3: Identify the partner user (assuming it's either the sender or receiver)
+        var partnerMessage = conversationGroup.FirstOrDefault();
+        var partnerId = partnerMessage.SenderId == conversationGroup.First().ReceiverId
+            ? partnerMessage.SenderId
+            : partnerMessage.ReceiverId;
+
+        // Fetch partner details
+        var partnerName = partnerId != null ? await _userService.GetUserNameByIdAsync(partnerId) : "Unknown";
+        var partnerAvatarUrl = partnerId != null ? await _userService.FetchUserAvatarUrlByIdAsync(partnerId) : null;
+
+        // Step 4: Populate the DTO with message details
+        var conversationDto = new GroupedMessageDTO
+        {
+            ConversationId = conversationId,
+            PartnerId = partnerId,
+            PartnerName = partnerName,
+            PartnerAvatarUrl = partnerAvatarUrl,
+            UnreadMessageCount = conversationGroup.Count(m => !m.IsRead && m.ReceiverId == partnerMessage.ReceiverId),
+            Messages = conversationGroup.Select(m => new MessageWithUserDetailsDTO
+            {
+                Id = m.Id,
+                Content = m.Content,
+                SentTime = m.SentTime,
+                Sender = new UserDetailsDTO
+                {
+                    Id = m.Sender.Id,
+                    UserName = m.Sender.UserName,
+                    AvatarUrl = m.Sender.AvatarUrl
+                },
+                IsRead = m.IsRead
+            }).ToList()
+        };
+
+        return Ok(conversationDto);
     }
 
     [HttpPost("MarkAsRead")]

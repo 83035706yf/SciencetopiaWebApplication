@@ -91,6 +91,60 @@ namespace Sciencetopia.Hubs
             await Clients.User(receiverId).SendAsync("updateConversationMessages", conversationId, conversationMessageCount);
         }
 
+        public async Task<GroupedMessageDTO> GetOrStartConversation(string userId1, string userId2)
+        {
+            // Check if a conversation already exists between these users
+            var existingConversation = await _context.Conversations
+                .Include(c => c.Messages)
+                .FirstOrDefaultAsync(c => c.Messages.Any(m => (m.SenderId == userId1 && m.ReceiverId == userId2) ||
+                                                               (m.SenderId == userId2 && m.ReceiverId == userId1)));
+
+            if (existingConversation != null)
+            {
+                // Identify the partner ID (the other user in the conversation)
+                var partnerMessage = existingConversation.Messages.FirstOrDefault();
+                var partnerId = partnerMessage.SenderId == userId1 ? partnerMessage.ReceiverId : partnerMessage.SenderId;
+
+                // Return minimal information since details will be fetched on the frontend
+                return new GroupedMessageDTO
+                {
+                    ConversationId = existingConversation.Id,
+                    PartnerId = partnerId
+                };
+            }
+
+            // If no existing conversation, create a new conversation entry
+            var newConversation = new Conversation
+            {
+                Id = Guid.NewGuid().ToString(),
+                Messages = new List<Message>()
+            };
+            _context.Conversations.Add(newConversation);
+            await _context.SaveChangesAsync();
+
+            // Fetch partner information directly from the Identity system
+            var partner = await _context.Users
+                .Where(u => u.Id == userId2)
+                .Select(u => new { u.UserName, u.AvatarUrl })
+                .FirstOrDefaultAsync();
+
+            if (partner == null)
+            {
+                throw new Exception("User not found.");
+            }
+
+            // Return a new GroupedMessageDTO for the newly created conversation
+            return new GroupedMessageDTO
+            {
+                ConversationId = newConversation.Id,
+                PartnerId = userId2,
+                PartnerName = partner.UserName,
+                PartnerAvatarUrl = partner.AvatarUrl,
+                UnreadMessageCount = 0,
+                Messages = new List<MessageWithUserDetailsDTO>()  // Empty list for a new conversation
+            };
+        }
+
         public async Task JoinConversation(string conversationId)
         {
             await Groups.AddToGroupAsync(Context.ConnectionId, conversationId);
@@ -154,12 +208,12 @@ namespace Sciencetopia.Hubs
                         n.Data
                     })
                     .ToListAsync();
-                
+
                 // Send the unread notification count to the user
                 var unreadNotificationCount = await _context.Notifications
                     .Where(n => n.UserId == userId && !n.IsRead)
                     .CountAsync();
-                
+
                 await Clients.Caller.SendAsync("updateNotifications", unreadNotificationCount);
             }
 
