@@ -44,7 +44,7 @@ public class StudyPlanService
                 // Create the StudyPlan node with a unique id
                 await transaction.RunAsync($@"
             CREATE (p:StudyPlan {{id: $studyPlanId, title: $title, introduction: $introduction}})
-            RETURN p", new { studyPlanId, title = studyPlan?.Title, introduction = studyPlan?.Introduction });
+            RETURN p", new { studyPlanId, title = studyPlan?.Title, introduction = studyPlan?.Introduction?.Description });
 
                 // Connect the User to the StudyPlan
                 await transaction.RunAsync($@"
@@ -164,7 +164,7 @@ public class StudyPlanService
                 await transaction.RunAsync($@"
                 MATCH (p:StudyPlan {{id: $studyPlanId}})
                 SET p.title = $title, p.introduction = $introduction",
-                    new { studyPlanId, title = studyPlan?.Title, introduction = studyPlan?.Introduction });
+                    new { studyPlanId, title = studyPlan?.Title, introduction = studyPlan?.Introduction?.Description });
 
                 // Delete old relationships (but not the lessons or resources themselves)
                 await transaction.RunAsync($@"
@@ -356,7 +356,7 @@ public class StudyPlanService
                     {
                         Id = studyPlanId,
                         Title = studyPlanNode.Properties["title"].As<string>(),
-                        Introduction = studyPlanNode.Properties.ContainsKey("introduction") ? studyPlanNode.Properties["introduction"].As<string>() : null,
+                        Introduction = studyPlanNode.Properties.ContainsKey("introduction") ? new Introduction { Description = studyPlanNode.Properties["introduction"].As<string>() } : null,
                         Prerequisite = prerequisiteLessons,
                         MainCurriculum = mainCurriculumLessons,
                         AdvancedTopics = advancedTopicsLessons, // Still return advanced topics separately
