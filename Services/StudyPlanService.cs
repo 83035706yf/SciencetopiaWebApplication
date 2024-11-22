@@ -43,8 +43,8 @@ public class StudyPlanService
 
                 // Create the StudyPlan node with a unique id
                 await transaction.RunAsync($@"
-            CREATE (p:StudyPlan {{id: $studyPlanId, title: $title, introduction: $introduction}})
-            RETURN p", new { studyPlanId, title = studyPlan?.Title, introduction = studyPlan?.Introduction?.Description });
+            CREATE (p:StudyPlan {{id: $studyPlanId, title: $title, introduction: $introduction, keywords: $keywords}})
+            RETURN p", new { studyPlanId, title = studyPlan?.Title, introduction = studyPlan?.Introduction?.Description, keywords = studyPlan?.Introduction?.Keywords });
 
                 // Connect the User to the StudyPlan
                 await transaction.RunAsync($@"
@@ -61,9 +61,9 @@ public class StudyPlanService
                     await transaction.RunAsync($@"
                 MATCH (p:StudyPlan {{id: $studyPlanId}})
                 MERGE (l:Lesson {{id: $lessonId}})
-                ON CREATE SET l.name = $name, l.description = $description
+                ON CREATE SET l.name = $name, l.description = $description, l.keywords = $keywords
                 MERGE (p)-[:HAS_PREREQUISITE]->(l)",
-                        new { studyPlanId, lessonId, name = lesson.Name, description = lesson.Description });
+                        new { studyPlanId, lessonId, name = lesson.Name, description = lesson.Description, keywords = lesson.Keywords });
 
                     // Add resources for each prerequisite lesson
                     foreach (var resource in lesson.Resources)
@@ -84,9 +84,9 @@ public class StudyPlanService
                     await transaction.RunAsync($@"
                 MATCH (p:StudyPlan {{id: $studyPlanId}})
                 MERGE (l:Lesson {{id: $lessonId}})
-                ON CREATE SET l.name = $name, l.description = $description
+                ON CREATE SET l.name = $name, l.description = $description, l.keywords = $keywords
                 MERGE (p)-[:HAS_MAIN_CURRICULUM]->(l)",
-                        new { studyPlanId, lessonId, name = lesson.Name, description = lesson.Description });
+                        new { studyPlanId, lessonId, name = lesson.Name, description = lesson.Description, keywords = lesson.Keywords });
 
                     // Add resources for each main curriculum lesson
                     foreach (var resource in lesson.Resources)
@@ -107,9 +107,9 @@ public class StudyPlanService
                     await transaction.RunAsync($@"
                 MATCH (p:StudyPlan {{id: $studyPlanId}})
                 MERGE (l:Lesson {{id: $lessonId}})
-                ON CREATE SET l.name = $name, l.description = $description
+                ON CREATE SET l.name = $name, l.description = $description, l.keywords = $keywords
                 MERGE (p)-[:HAS_ADVANCED_TOPIC]->(l)",
-                        new { studyPlanId, lessonId, name = lesson.Name, description = lesson.Description });
+                        new { studyPlanId, lessonId, name = lesson.Name, description = lesson.Description, keywords = lesson.Keywords });
 
                     // Add resources for each advanced topic lesson
                     foreach (var resource in lesson.Resources)
@@ -302,9 +302,9 @@ public class StudyPlanService
                  EXISTS((mc)-[:FINISHED_LEARNING {{userId: u.id}}]->(mcRes)) AS mcLearned,
                  EXISTS((at)-[:FINISHED_LEARNING {{userId: u.id}}]->(atRes)) AS atLearned
             WITH sp, pr, mc, at,
-                 collect(DISTINCT {{resource: prRes.link, learned: prLearned}}) AS prResources,
-                 collect(DISTINCT {{resource: mcRes.link, learned: mcLearned}}) AS mcResources,
-                 collect(DISTINCT {{resource: atRes.link, learned: atLearned}}) AS atResources
+                 collect(DISTINCT {{resource: prRes.link, name: prRes.name, learned: prLearned}}) AS prResources,
+                 collect(DISTINCT {{resource: mcRes.link, name: mcRes.name, learned: mcLearned}}) AS mcResources,
+                 collect(DISTINCT {{resource: atRes.link, name: atRes.name, learned: atLearned}}) AS atResources
             RETURN sp AS StudyPlan, 
                    sp.id AS studyPlanId,
                    collect(DISTINCT {{lesson: pr, lessonId: pr.id, resources: prResources}}) AS Prerequisites, 
@@ -356,7 +356,7 @@ public class StudyPlanService
                     {
                         Id = studyPlanId,
                         Title = studyPlanNode.Properties["title"].As<string>(),
-                        Introduction = studyPlanNode.Properties.ContainsKey("introduction") ? new Introduction { Description = studyPlanNode.Properties["introduction"].As<string>() } : null,
+                        Introduction = studyPlanNode.Properties.ContainsKey("introduction") ? new Introduction { Description = studyPlanNode.Properties["introduction"].As<string>(), Keywords = studyPlanNode.Properties.ContainsKey("Keywords") ? studyPlanNode.Properties["Keywords"].As<List<string>>() : new List<string>() } : null,
                         Prerequisite = prerequisiteLessons,
                         MainCurriculum = mainCurriculumLessons,
                         AdvancedTopics = advancedTopicsLessons, // Still return advanced topics separately
@@ -459,6 +459,7 @@ public class StudyPlanService
                     Id = lessonNode.Properties.ContainsKey("id") ? lessonNode.Properties["id"]?.As<string>() : "No ID available",
                     Name = lessonNode.Properties.ContainsKey("name") ? lessonNode.Properties["name"]?.As<string>() : "Unnamed Lesson",
                     Description = lessonNode.Properties.ContainsKey("description") ? lessonNode.Properties["description"]?.As<string>() : "No description available",
+                    Keywords = lessonNode.Properties.ContainsKey("keywords") ? lessonNode.Properties["keywords"]?.As<List<string>>() : new List<string>(),
                     Resources = resources, // Return resources or an empty list
                     FinishedResourcesCount = finishedResourcesCount,
                     ProgressPercentage = progressPercentage

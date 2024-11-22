@@ -15,8 +15,8 @@ public class KnowledgeGraphService
         var result = await session.RunAsync(@"
         // Fetch knowledge nodes and their relationships
         MATCH (n)-[r]->(m)
-        WHERE (n:Subject OR n:Field OR n:Topic OR n:Keyword OR n:People OR n:Works OR n:Event) AND
-              (m:Subject OR m:Field OR m:Topic OR m:Keyword OR m:People OR m:Works OR m:Event)
+        WHERE (n:Subject OR n:Field OR n:Topic OR n:Keyword) AND
+              (m:Subject OR m:Field OR m:Topic OR m:Keyword)
         // Optionally match resources linked to these nodes
         OPTIONAL MATCH (n)-[:HAS_RESOURCE]->(nr:Resource)
         OPTIONAL MATCH (m)-[:HAS_RESOURCE]->(mr:Resource)
@@ -234,18 +234,21 @@ public class KnowledgeGraphService
         return "Node created successfully.";
     }
 
-    public async Task<bool> CreateRelationshipAsync(object sourceNodeName, object targetNodeName, object relationshipType, string userId)
+    public async Task<bool> CreateRelationshipAsync(string sourceNodeName, string targetNodeName, string relationshipType, string userId)
     {
         if (sourceNodeName == null || targetNodeName == null || relationshipType == null)
             throw new ArgumentNullException("Source node name, target node name, and relationship type are all required.");
 
         using var session = _driver.AsyncSession();
-        var result = await session.RunAsync(@"
-            MATCH (source), (target)
-            WHERE source.name = $sourceNodeName AND target.name = $targetNodeName
-            CREATE (source)-[:$relationshipType {status: 'pending_approval', contributor: $userId}]->(target)
-            RETURN source, target",
-            new { sourceNodeName, targetNodeName, relationshipType, userId });
+
+        // Construct the query dynamically with the relationship type
+        var query = $@"
+        MATCH (source), (target)
+        WHERE source.name = $sourceNodeName AND target.name = $targetNodeName
+        CREATE (source)-[:{relationshipType} {{status: 'pending_approval', contributor: $userId}}]->(target)
+        RETURN source, target";
+
+        var result = await session.RunAsync(query, new { sourceNodeName, targetNodeName, userId });
 
         return await result.FetchAsync(); // True if the operation was successful
     }
