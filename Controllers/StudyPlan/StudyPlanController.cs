@@ -64,6 +64,34 @@ namespace Sciencetopia.Controllers
             return Ok(studyPlans);
         }
 
+        [HttpGet("GetStudyPlanById")]
+        public async Task<IActionResult> GetStudyPlanById([FromQuery] string studyPlanId, string targetUserId)
+        {
+            // Fetch the current authenticated user's ID from claims
+            var currentUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrEmpty(targetUserId))
+            {
+                return Unauthorized("User is not authenticated.");
+            }
+
+            // Fetch the study plan using the service
+            if (string.IsNullOrEmpty(currentUserId))
+            {
+                return Unauthorized("User is not authenticated.");
+            }
+
+            var studyPlan = await _studyPlanService.GetStudyPlanByIdAsync(studyPlanId, targetUserId, currentUserId);
+
+            if (studyPlan == null)
+            {
+                return NotFound(new { message = "Study plan not found." });
+            }
+
+            return Ok(studyPlan);
+        }
+
+
         [HttpPost("UpdateStudyPlan")]
         public async Task<IActionResult> UpdateStudyPlan([FromBody] StudyPlanDTO studyPlanDTO)
         {

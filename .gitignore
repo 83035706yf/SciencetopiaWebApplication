@@ -1,2 +1,4 @@
 # neo4j settings
 appsettings.json
+out
+obj

@@ -469,6 +469,90 @@ public class StudyPlanService
             .ToList(); // Convert to List<Lesson>
     }
 
+    public async Task<StudyPlanDTO?> GetStudyPlanByIdAsync(string studyPlanId, string targetUserId, string currentUserId)
+    {
+        using var session = _neo4jDriver.AsyncSession();
+        try
+        {
+            var result = await session.RunAsync($@"
+   MATCH (u:User {{id: $targetUserId}})-[:CREATED]->(sp:StudyPlan {{id: $studyPlanId}})
+            WHERE sp.privacy = 'public' OR sp.privacy = 'shared' OR u.id = $currentUserId
+            OPTIONAL MATCH (sp)-[:HAS_PREREQUISITE]->(pr:Lesson)
+            OPTIONAL MATCH (pr)-[:HAS_RESOURCE]->(prRes:Resource)
+            OPTIONAL MATCH (sp)-[:HAS_MAIN_CURRICULUM]->(mc:Lesson)
+            OPTIONAL MATCH (mc)-[:HAS_RESOURCE]->(mcRes:Resource)
+            OPTIONAL MATCH (sp)-[:HAS_ADVANCED_TOPIC]->(at:Lesson)
+            OPTIONAL MATCH (at)-[:HAS_RESOURCE]->(atRes:Resource)
+            WITH sp, pr, prRes, mc, mcRes, at, atRes,
+                 EXISTS((pr)-[:FINISHED_LEARNING {{userId: u.id}}]->(prRes)) AS prLearned,
+                 EXISTS((mc)-[:FINISHED_LEARNING {{userId: u.id}}]->(mcRes)) AS mcLearned,
+                 EXISTS((at)-[:FINISHED_LEARNING {{userId: u.id}}]->(atRes)) AS atLearned
+            WITH sp, pr, mc, at,
+                 collect(DISTINCT {{resource: prRes.link, name: prRes.name, learned: prLearned}}) AS prResources,
+                 collect(DISTINCT {{resource: mcRes.link, name: mcRes.name, learned: mcLearned}}) AS mcResources,
+                 collect(DISTINCT {{resource: atRes.link, name: atRes.name, learned: atLearned}}) AS atResources
+            RETURN sp AS StudyPlan, 
+                   sp.id AS studyPlanId,
+                   collect(DISTINCT {{lesson: pr, lessonId: pr.id, resources: prResources}}) AS Prerequisites, 
+                   collect(DISTINCT {{lesson: mc, lessonId: mc.id, resources: mcResources}}) AS MainCurriculum,
+                   collect(DISTINCT {{lesson: at, lessonId: at.id, resources: atResources}}) AS AdvancedTopics
+        ", new { studyPlanId, currentUserId, targetUserId });
+
+
+            var record = await result.SingleAsync();
+            if (record == null || !record.Values.Any()) return null;
+
+            var studyPlanNode = record["StudyPlan"].As<INode>();
+            var prerequisitesData = record["Prerequisites"].As<List<object>>();
+            var mainCurriculumData = record["MainCurriculum"].As<List<object>>();
+            var advancedTopicsData = record["AdvancedTopics"].As<List<object>>();
+
+            // Transform data into DTOs
+            var prerequisites = TransformLessonsWithProgress(prerequisitesData);
+            var mainCurriculum = TransformLessonsWithProgress(mainCurriculumData);
+            var advancedTopics = TransformLessonsWithProgress(advancedTopicsData);
+
+            // Calculate progress percentages
+            var totalResources = prerequisites.Sum(l => l.Resources.Count) + mainCurriculum.Sum(l => l.Resources.Count);
+            var learnedResources = prerequisites.Sum(l => l.Resources.Count(r => r.Learned)) + mainCurriculum.Sum(l => l.Resources.Count(r => r.Learned));
+            var progressPercentage = totalResources > 0 ? (float)learnedResources / totalResources * 100 : 0;
+
+            var totalAdvancedResources = advancedTopics.Sum(l => l.Resources.Count);
+            var learnedAdvancedResources = advancedTopics.Sum(l => l.Resources.Count(r => r.Learned));
+            var advancedTopicProgressPercentage = totalAdvancedResources > 0 ? (float)learnedAdvancedResources / totalAdvancedResources * 100 : 0;
+
+            var isCompleted = learnedResources == totalResources && totalResources > 0;
+
+            return new StudyPlanDTO
+            {
+                StudyPlan = new StudyPlanDetail
+                {
+                    Id = studyPlanNode.Properties["id"].As<string>(),
+                    Title = studyPlanNode.Properties["title"].As<string>(),
+                    Introduction = studyPlanNode.Properties.ContainsKey("introduction")
+                        ? new Introduction
+                        {
+                            Description = studyPlanNode.Properties["introduction"].As<string>(),
+                            Keywords = studyPlanNode.Properties.ContainsKey("keywords")
+                                ? studyPlanNode.Properties["keywords"].As<List<string>>()
+                                : new List<string>()
+                        }
+                        : null,
+                    Prerequisite = prerequisites,
+                    MainCurriculum = mainCurriculum,
+                    AdvancedTopics = advancedTopics,
+                    ProgressPercentage = progressPercentage,
+                    AdvancedTopicProgressPercentage = advancedTopicProgressPercentage,
+                    Completed = isCompleted
+                }
+            };
+        }
+        finally
+        {
+            await session.CloseAsync();
+        }
+    }
+
     public async Task<bool> DeleteStudyPlanAsync(string studyPlanTitle, string currentUserId)
     {
         var session = _neo4jDriver.AsyncSession();
