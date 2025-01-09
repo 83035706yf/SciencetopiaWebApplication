@@ -44,7 +44,7 @@ dotnet restore
 ---
 
 ### **3. 配置数据库**
-在项目根目录找到 `appsettings.json` 文件，更新 Neo4j 数据库连接字符串。
+在项目根目录中添加 `appsettings.json` 文件。
 
 ---
 
