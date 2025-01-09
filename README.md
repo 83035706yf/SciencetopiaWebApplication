@@ -44,7 +44,7 @@ dotnet restore
 ---
 
 ### **3. 配置数据库**
-在项目根目录中添加 `appsettings.json` 文件。
+在项目根目录中添加包含数据库连接字符串的 `appsettings.json` 文件。
 
 ---
 
