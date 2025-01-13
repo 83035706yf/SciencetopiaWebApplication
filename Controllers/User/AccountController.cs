@@ -28,8 +28,9 @@ namespace Sciencetopia.Controllers
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly UserService _userService;
         private readonly EmailTemplateService _emailTemplateService;
+        private readonly IWebHostEnvironment _env;
 
-        public AccountController(IConfiguration configuration, IHttpClientFactory httpClientFactory, UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IEmailSender emailSender, ISmsSender smsSender, BlobServiceClient blobServiceClient, IDriver driver, UserService userService, EmailTemplateService emailTemplateService)
+        public AccountController(IConfiguration configuration, IHttpClientFactory httpClientFactory, UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IEmailSender emailSender, ISmsSender smsSender, BlobServiceClient blobServiceClient, IDriver driver, UserService userService, EmailTemplateService emailTemplateService, IWebHostEnvironment env)
         {
             _userManager = userManager;
             _signInManager = signInManager;
@@ -45,6 +46,7 @@ namespace Sciencetopia.Controllers
             // 从配置文件中加载微信 AppId 和 AppSecret
             _weChatAppId = configuration["WeChat:AppId"];
             _weChatAppSecret = configuration["WeChat:AppSecret"];
+            _env = env;
         }
 
         [HttpPost("Register")]
@@ -248,16 +250,16 @@ namespace Sciencetopia.Controllers
             var user = await _userManager.FindByIdAsync(userId);
             if (user == null)
             {
-                return PhysicalFile(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "EmailChangeFailed.html"), "text/html");
+                return PhysicalFile(Path.Combine(_env.WebRootPath, "EmailTemplates", "EmailChangeFailed.html"), "text/html");
             }
 
             var result = await _userManager.ChangeEmailAsync(user, email, token);
             if (!result.Succeeded)
             {
-                return PhysicalFile(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "EmailChangeFailed.html"), "text/html");
+                return PhysicalFile(Path.Combine(_env.WebRootPath, "EmailTemplates", "EmailChangeFailed.html"), "text/html");
             }
 
-            return PhysicalFile(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "EmailChangeSuccess.html"), "text/html");
+            return PhysicalFile(Path.Combine(_env.WebRootPath, "EmailTemplates", "EmailChangeSuccess.html"), "text/html");
         }
 
         [HttpPost("ChangePhoneNumber")]
